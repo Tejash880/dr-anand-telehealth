@@ -15,7 +15,7 @@ class VercelPathRewriteMiddleware(BaseHTTPMiddleware):
             clean = subpath.lstrip("/")
             request.scope["path"] = f"/api/{clean}"
         elif request.scope.get("path") in ["/api/index.py", "/index.py"]:
-            request.scope["path"] = "/api/health"
+            request.scope["path"] = "/"
         return await call_next(request)
 
 app.add_middleware(VercelPathRewriteMiddleware)
