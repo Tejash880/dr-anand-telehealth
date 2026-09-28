@@ -6,13 +6,16 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from backend.main import app
 from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
 
-@app.api_route("/api/index.py", methods=["GET", "POST", "OPTIONS"])
-@app.api_route("/index.py", methods=["GET", "POST", "OPTIONS"])
-async def handle_vercel_index_debug(request: Request):
-    return {
-        "url_path": request.url.path,
-        "scope_path": request.scope.get("path"),
-        "headers": {k: v for k, v in request.headers.items() if "auth" not in k.lower()}
-    }
+class VercelPathRewriteMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        subpath = request.query_params.get("path")
+        if subpath:
+            clean = subpath.lstrip("/")
+            request.scope["path"] = f"/api/{clean}"
+        elif request.scope.get("path") in ["/api/index.py", "/index.py"]:
+            request.scope["path"] = "/api/health"
+        return await call_next(request)
 
+app.add_middleware(VercelPathRewriteMiddleware)
