@@ -597,10 +597,12 @@ def generate_comprehensive_doctor_report(
     }
 
 @app.get("/api/health")
+@app.get("/health")
 def health():
     return {"status": "healthy", "service": "Dr. Anand Medical Care", "doctor": "Dr. Anand, MBBS, MD", "version": "3.5.0"}
 
 @app.post("/api/consult")
+@app.post("/consult")
 def consult_ai_doctor(req: ConsultationRequest):
     if not req.symptoms.strip():
         raise HTTPException(status_code=400, detail="Please provide at least one symptom.")
@@ -645,6 +647,7 @@ def consult_ai_doctor(req: ConsultationRequest):
     return report
 
 @app.post("/api/doctor/ask")
+@app.post("/doctor/ask")
 def ask_doctor(req: DoctorAskRequest):
     """
     Live Follow-Up Question Answered Directly by Dr. Anand, MD.
@@ -666,21 +669,22 @@ def ask_doctor(req: DoctorAskRequest):
         "timestamp": datetime.now(timezone.utc).strftime("%I:%M %p UTC")
     }
 
-# Production Static Frontend SPA Hosting
-dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
-if os.path.isdir(dist_dir):
-    assets_dir = os.path.join(dist_dir, "assets")
-    if os.path.isdir(assets_dir):
-        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+# Production Static Frontend SPA Hosting (Only outside Vercel, e.g. standalone Docker)
+if not os.environ.get("VERCEL"):
+    dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+    if os.path.isdir(dist_dir):
+        assets_dir = os.path.join(dist_dir, "assets")
+        if os.path.isdir(assets_dir):
+            app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
-    @app.get("/{full_path:path}")
-    async def serve_spa_frontend(full_path: str):
-        if full_path.startswith("api"):
-            raise HTTPException(status_code=404, detail="API endpoint not found")
-        target_file = os.path.join(dist_dir, full_path)
-        if os.path.isfile(target_file):
-            return FileResponse(target_file)
-        index_file = os.path.join(dist_dir, "index.html")
-        if os.path.isfile(index_file):
-            return FileResponse(index_file)
-        return {"status": "Dr. Anand Medical Care Telehealth Active"}
+        @app.get("/{full_path:path}")
+        async def serve_spa_frontend(full_path: str):
+            if full_path.startswith("api"):
+                raise HTTPException(status_code=404, detail="API endpoint not found")
+            target_file = os.path.join(dist_dir, full_path)
+            if os.path.isfile(target_file):
+                return FileResponse(target_file)
+            index_file = os.path.join(dist_dir, "index.html")
+            if os.path.isfile(index_file):
+                return FileResponse(index_file)
+            return {"status": "Dr. Anand Medical Care Telehealth Active"}
