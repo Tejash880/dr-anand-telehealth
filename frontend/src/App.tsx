@@ -208,6 +208,77 @@ export function App() {
     }
   };
 
+  // Pre-load and cache voices on mount
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+
+  useEffect(() => {
+    const loadVoices = () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        const v = window.speechSynthesis.getVoices();
+        if (v && v.length > 0) {
+          setAvailableVoices(v);
+        }
+      }
+    };
+
+    loadVoices();
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+  }, []);
+
+  const isFemaleVoice = (name: string): boolean => {
+    const lower = name.toLowerCase();
+    const femaleKeywords = [
+      'female', 'zira', 'susan', 'catherine', 'hazel', 'heera', 'eva', 
+      'linda', 'samantha', 'karen', 'victoria', 'fiona', 'veena', 'jenny', 
+      'aria', 'sonia', 'julie', 'alva', 'kendra', 'sarah', 'amy', 'emma', 
+      'joanna', 'salli', 'ivy', 'zoe', 'natasha', 'google us english'
+    ];
+    return femaleKeywords.some(k => lower.includes(k));
+  };
+
+  const getMaleDoctorVoice = (): SpeechSynthesisVoice | null => {
+    const voiceList = (availableVoices && availableVoices.length > 0)
+      ? availableVoices
+      : (typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis.getVoices() : []);
+
+    if (!voiceList || voiceList.length === 0) return null;
+
+    // 1. Explicit Male Priority: David (Windows standard), George, Mark, Ravi, Guy, Alex, Daniel
+    const maleNames = [
+      'david', 'george', 'mark', 'ravi', 'guy', 'james', 'richard',
+      'tom', 'alex', 'daniel', 'oliver', 'aaron', 'arthur', 'ryan',
+      'christopher', 'eric', 'steven', 'brian', 'andrew', 'uk english male', 'us english male'
+    ];
+
+    for (const mName of maleNames) {
+      const match = voiceList.find(v => 
+        v.lang.startsWith('en') && 
+        v.name.toLowerCase().includes(mName) && 
+        !isFemaleVoice(v.name)
+      );
+      if (match) return match;
+    }
+
+    // 2. Contains word 'male' in name
+    const genericMale = voiceList.find(v => 
+      v.lang.startsWith('en') && 
+      /\bmale\b/i.test(v.name) && 
+      !isFemaleVoice(v.name)
+    );
+    if (genericMale) return genericMale;
+
+    // 3. Fallback: Any English voice that is NOT in the female list
+    const nonFemale = voiceList.find(v => 
+      v.lang.startsWith('en') && 
+      !isFemaleVoice(v.name)
+    );
+    if (nonFemale) return nonFemale;
+
+    return voiceList[0] || null;
+  };
+
   const toggleAudioVoice = () => {
     if (!report) return;
 
@@ -223,26 +294,13 @@ export function App() {
     const script = `Hello ${report.patient.name || 'there'}. This is ${report.doctor_info.name}. Based on your reported symptoms, my clinical diagnosis is ${report.diagnosis}. I have prescribed ${report.prescriptions.map(p => p.name).join(', ')}. ${primaryAdvice}. Wishing you a rapid recovery!`;
 
     const utterance = new SpeechSynthesisUtterance(script);
-    
-    // Select an articulate male voice
-    const voices = window.speechSynthesis.getVoices();
-    const maleVoice = voices.find(v => 
-      v.lang.startsWith('en') && 
-      (v.name.toLowerCase().includes('male') || 
-       v.name.toLowerCase().includes('david') || 
-       v.name.toLowerCase().includes('george') || 
-       v.name.toLowerCase().includes('mark') || 
-       v.name.toLowerCase().includes('james') || 
-       v.name.toLowerCase().includes('guy') || 
-       v.name.toLowerCase().includes('natural') ||
-       v.name.toLowerCase().includes('uk english male'))
-    ) || voices.find(v => v.lang.startsWith('en') && !v.name.toLowerCase().includes('female') && !v.name.toLowerCase().includes('zira') && !v.name.toLowerCase().includes('susan'));
-
+    const maleVoice = getMaleDoctorVoice();
     if (maleVoice) {
       utterance.voice = maleVoice;
     }
-    utterance.rate = 0.92;
-    utterance.pitch = 0.88; // Deep, calm, authoritative male physician tone
+    // Deep, calm, authoritative male physician tone
+    utterance.pitch = 0.72;
+    utterance.rate = 0.88;
     utterance.onend = () => setIsPlayingAudio(false);
     utterance.onerror = () => setIsPlayingAudio(false);
 
@@ -291,24 +349,13 @@ export function App() {
 
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    const voices = window.speechSynthesis.getVoices();
-    const maleVoice = voices.find(v => 
-      v.lang.startsWith('en') && 
-      (v.name.toLowerCase().includes('male') || 
-       v.name.toLowerCase().includes('david') || 
-       v.name.toLowerCase().includes('george') || 
-       v.name.toLowerCase().includes('mark') || 
-       v.name.toLowerCase().includes('james') || 
-       v.name.toLowerCase().includes('guy') || 
-       v.name.toLowerCase().includes('natural') ||
-       v.name.toLowerCase().includes('uk english male'))
-    ) || voices.find(v => v.lang.startsWith('en') && !v.name.toLowerCase().includes('female') && !v.name.toLowerCase().includes('zira') && !v.name.toLowerCase().includes('susan'));
-
+    const maleVoice = getMaleDoctorVoice();
     if (maleVoice) {
       utterance.voice = maleVoice;
     }
-    utterance.rate = 0.92;
-    utterance.pitch = 0.88;
+    // Deep, calm, authoritative male physician tone
+    utterance.pitch = 0.72;
+    utterance.rate = 0.88;
     utterance.onend = () => setActiveSpeechIndex(null);
     utterance.onerror = () => setActiveSpeechIndex(null);
 
